@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading.Tasks;
 using Vault;
 using Vault.Client;
 using Newtonsoft.Json;
+using Vault.Model;
 
 namespace VaultSyncPlugin
 {
@@ -20,8 +22,18 @@ namespace VaultSyncPlugin
         private static async Task TraverseVault(VaultClient client, string mount,
             string path, Dictionary<string, SecretEntry> dict)
         {
-            var listResp = await client.Secrets.KvV2ListAsync(path, mount);
-            if (listResp.Data.Keys == null) return;
+            Console.WriteLine(@"Reading secrets from {0}/{1}", mount, path);
+            VaultResponse<StandardListResponse> listResp;
+            try
+            {
+                 listResp = await client.Secrets.KvV2ListAsync(path, mount);
+            }
+            catch (VaultApiException e)
+            {
+                if(e.StatusCode == 404) return;
+                throw;
+                
+            }
 
             foreach (var key in listResp.Data.Keys)
             {
@@ -33,6 +45,7 @@ namespace VaultSyncPlugin
                 else
                 {
                     string fullPath = string.IsNullOrEmpty(path) ? key :string.Format("{0}/{1}", path, key);
+                    Console.WriteLine(@"Found Secret at {0}/{1}", mount, fullPath);
                     var secret = await client.Secrets.KvV2ReadAsync(fullPath, mount);
                     // var meta = await client.Secrets.KvV2ReadMetadataAsync(fullPath,mount);
                     dict[fullPath] = new SecretEntry

@@ -30,6 +30,7 @@ namespace VaultSyncPlugin
                 if (!vaultDict.TryGetValue(entry.Key, out existing)
                     || !FieldsEqual(existing.Fields, entry.Value.Fields))
                 {
+                    Console.WriteLine(@"Writing new secrets to {0}/{1}", _mount, entry.Key);
                     await _vault.Secrets.KvV2WriteAsync(entry.Key, kvV2WriteRequest: new KvV2WriteRequest(Data: entry.Value.Fields), kvV2MountPath: _mount);
                 }
             }
@@ -37,6 +38,7 @@ namespace VaultSyncPlugin
             // 2️⃣  Delete anything in Vault not in KeePass
             foreach (var stale in vaultDict.Keys.Except(keePassDict.Keys))
             {
+                Console.WriteLine(@"Deleting stale secrets from {0}/{1}", _mount, stale);
                 await _vault.Secrets.KvV2DeleteMetadataAndAllVersionsAsync( path:stale, kvV2MountPath: _mount);
             }
         }
