@@ -54,7 +54,9 @@ namespace VaultSyncPlugin
         private SyncStatus syncStatus;
         private SyncStatusForm syncStatusForm;
         private Boolean initRun = false;
-
+        
+        
+        private String groupName = "Vault-Sync";
 
         /// <summary>
         /// The <c>Initialize</c> method is called by KeePass when
@@ -197,7 +199,7 @@ namespace VaultSyncPlugin
                 this.syncStatusForm = new SyncStatusForm(this.syncStatus);
             }
 
-            if (!initRun) Init();
+            Init();
 
             this.syncStatusForm.Show();
 
@@ -207,11 +209,17 @@ namespace VaultSyncPlugin
 
                 // We synchronize vault entries
                 // this.SynchronizeVaultEntries(this.host.Database.RootGroup);
+                var vaultGroup = getVaultGroup();
+                var validList = FindEntriesWithVaultConnectionInGroup(vaultGroup);
+                foreach (var pwconnectionString in validList)
+                {
+                    SyncVaultInstance(pwconnectionString, vaultGroup);
+                }
 
                 // Then we merge modified data, and refresh the UI. Standard way to do it, but barely documented.
-                this.host.Database.MergeIn(this.host.Database, PwMergeMethod.Synchronize);
+                host.Database.MergeIn(this.host.Database, PwMergeMethod.Synchronize);
 
-                // this.ExecuteInGuiThread(new Action(() => { this.host.MainWindow.UpdateUI(false, null, true, this.host.Database.RootGroup, true, null, true); }));
+                ExecuteInGuiThread(new Action(() => { this.host.MainWindow.UpdateUI(false, null, true, this.host.Database.RootGroup, true, null, true); }));
 
                 // NOTE: We don't automatically save the database
 
@@ -219,69 +227,109 @@ namespace VaultSyncPlugin
             });
         }
 
-        // Make sure Vault connection is established and folders exist
-        private void Init()
+        private PwGroup getVaultGroup()
         {
-            var rootGroup = host.Database.RootGroup;
-            var groupName = "Vault-Sync";
 
-            PwGroup vaultGroup = rootGroup.Groups.ToList().Find(x => x.Name.Equals(groupName));
-            if (vaultGroup == null)
-            {
-                MessageService.ShowInfo("Vault Group Folder couldn't be found: Creating");
-                rootGroup.AddGroup(new PwGroup(true, true, groupName, rootGroup.IconId), true);
+            return host.Database.RootGroup.Groups.ToList().Find(x => x.Name.Equals(groupName));
+        }
 
-                this.host.Database.MergeIn(this.host.Database, PwMergeMethod.Synchronize);
-                vaultGroup = rootGroup.Groups.First(x => x.Name.Equals(groupName));
-            }
-
-            //Try to find at least one Vault-Connection Secret
-            MessageService.ShowInfo(vaultGroup);
-
-            var validList = vaultGroup.Entries.ToList().FindAll(entry =>
+        private List<PwEntry> FindEntriesWithVaultConnectionInGroup(PwGroup group)
+        {
+            var validList = group.Entries.ToList().FindAll(entry =>
             {
                 var vaultLogin = this.GetKeepassEntryPropertyDereferenced(entry, PwDefs.UserNameField);
                 var vaultPassword = this.GetKeepassEntryPropertyDereferenced(entry, PwDefs.PasswordField);
                 var vaultUrl = this.GetKeepassEntryPropertyDereferenced(entry, PwDefs.UrlField);
-                var vaultAuthPath = this.GetKeepassEntryProperty(entry, "auth");
-                var vaultPath = this.GetKeepassEntryProperty(entry, "path");
+                // var vaultAuthPath = this.GetKeepassEntryProperty(entry, "auth");
+                // var vaultPath = this.GetKeepassEntryProperty(entry, "path");
                 return !string.IsNullOrEmpty(vaultUrl) &&
                        !string.IsNullOrEmpty(vaultLogin) &&
-                       !string.IsNullOrEmpty(vaultPassword) &&
-                       !string.IsNullOrEmpty(vaultPath) &&
-                       !string.IsNullOrEmpty(vaultAuthPath);
+                       !string.IsNullOrEmpty(vaultPassword); // &&
+                // !string.IsNullOrEmpty(vaultPath) &&
+                // !string.IsNullOrEmpty(vaultAuthPath);
             });
-            MessageService.ShowInfo(string.Format("Found {0} valid Connection Strings", validList));
-            if (validList.Count == 0) MessageService.ShowInfo("Please fill in the created Secret with the vault URL, ");
+            Console.WriteLine("Found {0} valid Connection Strings", validList.Count);
+            return validList;
+        }
+        // Make sure Vault connection is established and folders exist
+        private void Init()
+        {
+
+            var vaultGroup = getVaultGroup();
+            if (vaultGroup == null)
+            {
+                Console.WriteLine("Vault Group Folder couldn't be found: Creating");
+                host.Database.RootGroup.AddGroup(new PwGroup(true, true, groupName, host.Database.RootGroup.IconId), true);
+
+                SaveAndUpdateUI();
+                vaultGroup = host.Database.RootGroup.Groups.First(x => x.Name.Equals(groupName));
+            }
+
+            //Try to find at least one Vault-Connection Secret;
+
+            var validList = FindEntriesWithVaultConnectionInGroup(vaultGroup);
+            if (validList.Count == 0)
+            {
+                MessageService.ShowInfo("Please fill in the created Secret with the vault URL, Username and Password");
+                var vaultEntry = new PwEntry(false, true);
+                vaultEntry.Strings.Set(PwDefs.TitleField, new ProtectedString(false, "First Vault"));
+                vaultGroup.Entries.Add(vaultEntry);
+                // SaveAndUpdateUI();
+
+                return;
+            }
+
             foreach (PwEntry entry in validList)
             {
                 var entryName = GetKeepassEntryPropertyDereferenced(entry, PwDefs.TitleField);
                 //Ensure Folder exists in Database
-                try
-                {
-                    vaultGroup.Groups.ToList().Find(x =>
-                        x.Name.Equals(entryName));
-                }
-                catch (ArgumentNullException e)
-                {
-                    MessageService.ShowInfo(string.Format("Folder for connection string  {0} not found, creating"),
-                        entryName);
-                    rootGroup.AddGroup(new PwGroup(true, true, entryName, rootGroup.IconId), true);
-                }
 
-                sync(entry);
+                var groupForPassword = vaultGroup.Groups.ToList().Find(x =>
+                    x.Name.Equals(entryName));
+                if (groupForPassword == null)
+                {
+                    Console.WriteLine("No Folder for connection string {0} found, creating", entryName);
+                    vaultGroup.AddGroup(new PwGroup(true, true, entryName, host.Database.RootGroup.IconId), true);
+                    SaveAndUpdateUI();
+                }
+                
             }
         }
 
-        private void sync(PwEntry entry)
+        private async void SyncVaultInstance(PwEntry entry, PwGroup vaultGroup)
         {
-            VaultConfiguration config = new VaultConfiguration("http:127.0.0.1:8200");
-            VaultClient vaultClient = new VaultClient(config);
             var user = GetKeepassEntryPropertyDereferenced(entry, PwDefs.UserNameField);
             var pass = GetKeepassEntryPropertyDereferenced(entry, PwDefs.PasswordField);
-            vaultClient.Auth.UserpassLogin(username: user, userpassLoginRequest: new UserpassLoginRequest(pass),
-                userpassMountPath: null,
-                wrapTTL: null);
+            var url = GetKeepassEntryPropertyDereferenced(entry, PwDefs.UrlField);
+            var mountPath = GetKeepassEntryPropertyDereferenced(entry, "MountPath");
+            var vaultFolder = GetKeepassEntryPropertyDereferenced(entry, "VaultFolder");
+            VaultConfiguration config = new VaultConfiguration(url,
+                rateLimitConfiguration: new RateLimitConfiguration(1000, TimeSpan.FromMilliseconds(1)));
+            VaultClient vaultClient = new VaultClient(config);
+
+            var vaultResponse = vaultClient.Auth.UserpassLogin(
+                username: user,
+                userpassLoginRequest: new UserpassLoginRequest(pass),
+                userpassMountPath: "userpass");
+            // VaultResponse<Object> unwrappedResp = vaultClient.Unwrap<Object>(vaultResponse.ResponseWrapInfo.Token);
+            vaultClient.SetToken(token: vaultResponse.ResponseAuth.ClientToken);
+            var groupForPassword = vaultGroup.Groups.ToList().Find(x =>
+                x.Name.Equals( GetKeepassEntryPropertyDereferenced(entry, PwDefs.TitleField)));
+            
+            var keepassDict = KeePassDictionaryBuilder.Build(groupForPassword);
+            var vaultDict = await VaultDictionaryBuilder.BuildAsync(vaultClient,  mountPath, vaultFolder);
+            // 4. Sync (KeePass -> Vault) with change detection
+            var syncer = new OneWaySyncer(vaultClient, mountPath);
+            await syncer.SyncAsync(keepassDict, vaultDict);
+        }
+
+        private void SaveAndUpdateUI()
+        {
+            this.host.Database.MergeIn(this.host.Database, PwMergeMethod.Synchronize);
+            this.ExecuteInGuiThread(new Action(() =>
+            {
+                this.host.MainWindow.UpdateUI(false, null, true, this.host.Database.RootGroup, true, null, true);
+            }));
         }
 
         /// <summary>
