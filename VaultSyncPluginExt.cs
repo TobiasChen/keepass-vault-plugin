@@ -114,59 +114,6 @@ namespace VaultSyncPlugin
             host.MainWindow.FileSaved -= this.OnFileSaved;
         }
 
-        // /// <summary>
-        // /// Get a menu item of the plugin. See
-        // /// https://keepass.info/help/v2_dev/plg_index.html#co_menuitem
-        // /// </summary>
-        // /// <param name="t">Type of the menu that the plugin should
-        // /// return an item for.</param>
-        // public override ToolStripMenuItem GetMenuItem(PluginMenuType t)
-        // {
-        // 	// Our menu item below is intended for the main location(s),
-        // 	// not for other locations like the group or entry menus
-        // 	if(t != PluginMenuType.Main) return null;
-        //
-        // 	ToolStripMenuItem tsmi = new ToolStripMenuItem("VaultSyncPlugin");
-        //
-        // 	// Add menu item 'Add Some Groups'
-        // 	ToolStripMenuItem tsmiAddGroups = new ToolStripMenuItem();
-        // 	tsmiAddGroups.Text = "Add Some Groups";
-        // 	tsmiAddGroups.Click += this.OnMenuAddGroups;
-        // 	tsmi.DropDownItems.Add(tsmiAddGroups);
-        //
-        // 	// Add menu item 'Add Some Entries'
-        // 	ToolStripMenuItem tsmiAddEntries = new ToolStripMenuItem();
-        // 	tsmiAddEntries.Text = "Add Some Entries";
-        // 	tsmiAddEntries.Click += this.OnMenuAddEntries;
-        // 	tsmi.DropDownItems.Add(tsmiAddEntries);
-        //
-        // 	tsmi.DropDownItems.Add(new ToolStripSeparator());
-        //
-        // 	ToolStripMenuItem tsmiEntries30 = new ToolStripMenuItem();
-        // 	tsmiEntries30.Text = "Add 30 Entries Instead Of 10";
-        // 	tsmiEntries30.Click += this.OnMenuEntries30;
-        // 	tsmi.DropDownItems.Add(tsmiEntries30);
-        //
-        // 	// By using an anonymous method as event handler, we do not
-        // 	// need to remember menu item references manually, and
-        // 	// multiple calls of the GetMenuItem method (to show the
-        // 	// menu item in multiple places) are no problem
-        // 	tsmi.DropDownOpening += delegate(object sender, EventArgs e)
-        // 	{
-        // 		// Disable the commands 'Add Some Groups' and
-        // 		// 'Add Some Entries' when the database is not open
-        // 		PwDatabase pd = host.Database;
-        // 		bool bOpen = ((pd != null) && pd.IsOpen);
-        // 		tsmiAddGroups.Enabled = bOpen;
-        // 		tsmiAddEntries.Enabled = bOpen;
-        //
-        // 		// Update the checkmark of the menu item
-        // 		UIUtil.SetChecked(tsmiEntries30, m_bEntries30);
-        // 	};
-        //
-        // 	return tsmi;
-        // }
-
         /// <summary>
         /// Called when menu item is clicked.
         /// </summary>
@@ -212,6 +159,7 @@ namespace VaultSyncPlugin
                 var validList = FindEntriesWithVaultConnectionInGroup(vaultGroup);
                 foreach (var pwconnectionString in validList)
                 {
+                    syncStatus.AddLog("Syncing Secrets for Database Connection" + pwconnectionString.Strings.GetSafe(PwDefs.UrlField));
                     SyncVaultInstance(pwconnectionString, vaultGroup);
                 }
 
@@ -239,13 +187,12 @@ namespace VaultSyncPlugin
                 var vaultLogin = this.GetKeepassEntryPropertyDereferenced(entry, PwDefs.UserNameField);
                 var vaultPassword = this.GetKeepassEntryPropertyDereferenced(entry, PwDefs.PasswordField);
                 var vaultUrl = this.GetKeepassEntryPropertyDereferenced(entry, PwDefs.UrlField);
-                // var vaultAuthPath = this.GetKeepassEntryProperty(entry, "auth");
-                // var vaultPath = this.GetKeepassEntryProperty(entry, "path");
+                var mountPath = this.GetKeepassEntryProperty(entry, "MountPath");
                 return !string.IsNullOrEmpty(vaultUrl) &&
                        !string.IsNullOrEmpty(vaultLogin) &&
-                       !string.IsNullOrEmpty(vaultPassword); // &&
-                // !string.IsNullOrEmpty(vaultPath) &&
-                // !string.IsNullOrEmpty(vaultAuthPath);
+                       !string.IsNullOrEmpty(vaultPassword) &&
+                       !string.IsNullOrEmpty(mountPath); 
+                       // !string.IsNullOrEmpty(vaultFolder);
             });
             Console.WriteLine("Found {0} valid Connection Strings", validList.Count);
             return validList;
@@ -297,6 +244,7 @@ namespace VaultSyncPlugin
 
         private async void SyncVaultInstance(PwEntry entry, PwGroup vaultGroup)
         {
+            
             var user = GetKeepassEntryPropertyDereferenced(entry, PwDefs.UserNameField);
             var pass = GetKeepassEntryPropertyDereferenced(entry, PwDefs.PasswordField);
             var url = GetKeepassEntryPropertyDereferenced(entry, PwDefs.UrlField);
@@ -315,11 +263,15 @@ namespace VaultSyncPlugin
             var groupForPassword = vaultGroup.Groups.ToList().Find(x =>
                 x.Name.Equals( GetKeepassEntryPropertyDereferenced(entry, PwDefs.TitleField)));
             
+            syncStatus.AddLog("Loading Secrets from Keepass");
             var keepassDict = KeePassDictionaryBuilder.Build(groupForPassword);
+            syncStatus.AddLog("Loading Secrets from Vault");
             var vaultDict = await VaultDictionaryBuilder.BuildAsync(vaultClient,  mountPath, vaultFolder);
+            syncStatus.AddLog("Comparing Secrets");
             // 4. Sync (KeePass -> Vault) with change detection
             var syncer = new OneWaySyncer(vaultClient, mountPath);
-            await syncer.SyncAsync(keepassDict, vaultDict);
+            syncStatus.AddLog("Syncing Secrets to Vault");
+            await syncer.SyncAsync(keepassDict, vaultDict, syncStatus);
         }
 
         private void SaveAndUpdateUI()

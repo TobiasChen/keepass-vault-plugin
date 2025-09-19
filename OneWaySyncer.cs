@@ -21,7 +21,8 @@ namespace VaultSyncPlugin
 
         public async Task SyncAsync(
             Dictionary<string, SecretEntry> keePassDict,
-            Dictionary<string, SecretEntry> vaultDict)
+            Dictionary<string, SecretEntry> vaultDict,
+            SyncStatus syncStatus)
         {
             // 1️⃣  Create or update only if fields differ
             foreach (KeyValuePair<string, SecretEntry> entry in keePassDict)
@@ -30,7 +31,7 @@ namespace VaultSyncPlugin
                 if (!vaultDict.TryGetValue(entry.Key, out existing)
                     || !FieldsEqual(existing.Fields, entry.Value.Fields))
                 {
-                    Console.WriteLine(@"Writing new secrets to {0}/{1}", _mount, entry.Key);
+                    syncStatus.AddLog("Adding secrets to Vault: " + entry.Key);
                     await _vault.Secrets.KvV2WriteAsync(entry.Key, kvV2WriteRequest: new KvV2WriteRequest(Data: entry.Value.Fields), kvV2MountPath: _mount);
                 }
             }
@@ -38,7 +39,7 @@ namespace VaultSyncPlugin
             // 2️⃣  Delete anything in Vault not in KeePass
             foreach (var stale in vaultDict.Keys.Except(keePassDict.Keys))
             {
-                Console.WriteLine(@"Deleting stale secrets from {0}/{1}", _mount, stale);
+                syncStatus.AddLog("Deleting stale secret from Vault: " + stale);
                 await _vault.Secrets.KvV2DeleteMetadataAndAllVersionsAsync( path:stale, kvV2MountPath: _mount);
             }
         }
