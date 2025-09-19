@@ -53,7 +53,6 @@ namespace VaultSyncPlugin
         private ToolStripMenuItem menuItem;
         private SyncStatus syncStatus;
         private SyncStatusForm syncStatusForm;
-        private Boolean initRun = false;
         
         
         private String groupName = "Vault-Sync";

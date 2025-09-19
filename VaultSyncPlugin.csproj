@@ -54,9 +54,6 @@
     </Reference>
     <Reference Include="KeePass, Version=2.59.0.0, Culture=neutral, PublicKeyToken=fed2ed7716aecf5c, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <!--      <HintPath>-->
-      <!--        ../keepass/Build/KeePass/KeePass.exe-->
-      <!--      </HintPath>-->
       <HintPath>D:\Tobias\keepass\KeePass.exe</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
@@ -82,12 +79,6 @@
       <HintPath>packages\HashiCorp.Vault.0.3.0\lib\netstandard2.0\Vault.dll</HintPath>
     </Reference>
   </ItemGroup>
-<!--  <ItemGroup>-->
-<!--    <Reference Include="netstandard">-->
-<!--      <HintPath>packages\NETStandard.Library.2.0.3\build\netstandard2.0\ref\netstandard.dll</HintPath>-->
-<!--      <Private>False</Private>-->
-<!--    </Reference>-->
-<!--  </ItemGroup>-->
   <ItemGroup>
     <Compile Include="KeepassDictionaryBuilder.cs" />
     <Compile Include="OneWaySyncer.cs" />
@@ -107,15 +98,22 @@
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
-  <Target Name="AfterBuild" Condition="'$(Configuration)' == 'Release PLGX'">
-    <CallTarget Targets="BuildPlgx" />
-    <Move SourceFiles=".\Build\Release PLGX\VaultSyncPlugin.plgx" DestinationFolder="../../keepass/Plugins"/>
-  </Target>
+  <ItemGroup>
+    <Content Include="PlgxConfig.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
   <Target Name="AfterBuild" Condition="'$(Configuration)' == 'Debug'">
+    <Message Text="text to debug" Importance="high" />
     <ItemGroup>
       <GetFiles Include=".\Build\Debug\*"/>
     </ItemGroup>
     <Copy SourceFiles="%(GetFiles.Identity)" DestinationFolder="..\..\keepass\Plugins"/>
+  </Target>
+  <Target Name="AfterBuild" Condition="'$(Configuration)' == 'Release PLGX'">
+    <Message Text="text to output" Importance="high" />
+    <CallTarget Targets="BuildPlgx" />
+    <Copy SourceFiles=".\Build\Release PLGX\VaultSyncPlugin.plgx" DestinationFolder="../../keepass/Plugins"/>
   </Target>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -124,11 +122,4 @@
     <Error Condition="!Exists('packages\PlgxTool.1.0.3\build\PlgxTool.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\PlgxTool.1.0.3\build\PlgxTool.targets'))" />
   </Target>
   <Import Project="packages\PlgxTool.1.0.3\build\PlgxTool.targets" Condition="Exists('packages\PlgxTool.1.0.3\build\PlgxTool.targets')" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
 </Project>
