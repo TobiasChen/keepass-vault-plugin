@@ -103,18 +103,18 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-  <Target Name="AfterBuild" Condition="'$(Configuration)' == 'Debug'">
-    <Message Text="text to debug" Importance="high" />
-    <ItemGroup>
-      <GetFiles Include=".\Build\Debug\*"/>
-    </ItemGroup>
-    <Copy SourceFiles="%(GetFiles.Identity)" DestinationFolder="..\..\keepass\Plugins"/>
-  </Target>
   <Target Name="AfterBuild" Condition="'$(Configuration)' == 'Release PLGX'">
     <Message Text="text to output" Importance="high" />
     <CallTarget Targets="BuildPlgx" />
     <Copy SourceFiles=".\Build\Release PLGX\VaultSyncPlugin.plgx" DestinationFolder="../../keepass/Plugins"/>
   </Target>
+<!--  <Target Name="AfterBuild" Condition="'$(Configuration)' == 'Debug'">-->
+<!--    <Message Text="text to debug" Importance="high" />-->
+<!--    <ItemGroup>-->
+<!--      <GetFiles Include=".\Build\Debug\*"/>-->
+<!--    </ItemGroup>-->
+<!--    <Copy SourceFiles="%(GetFiles.Identity)" DestinationFolder="..\..\keepass\Plugins"/>-->
+<!--  </Target>-->
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see https://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
