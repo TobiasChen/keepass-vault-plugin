@@ -84,11 +84,6 @@ namespace VaultSyncPlugin
             menuItemCollection.Add(this.menuItem);
 
             this.syncStatus = new SyncStatus();
-
-            // We want a notification when the user tried to save
-            // the current database
-            this.host.MainWindow.FileSaved += this.OnFileSaved;
-
             return true; // Initialization successful
         }
 
@@ -111,7 +106,6 @@ namespace VaultSyncPlugin
             base.Terminate();
 
             // Remove event handler (important!)
-            host.MainWindow.FileSaved -= this.OnFileSaved;
         }
 
         /// <summary>
@@ -184,10 +178,10 @@ namespace VaultSyncPlugin
         {
             var validList = group.Entries.ToList().FindAll(entry =>
             {
-                var vaultLogin = this.GetKeepassEntryPropertyDereferenced(entry, PwDefs.UserNameField);
-                var vaultPassword = this.GetKeepassEntryPropertyDereferenced(entry, PwDefs.PasswordField);
-                var vaultUrl = this.GetKeepassEntryPropertyDereferenced(entry, PwDefs.UrlField);
-                var mountPath = this.GetKeepassEntryProperty(entry, "MountPath");
+                var vaultLogin = GetKeepassEntryPropertyDereferenced(entry, PwDefs.UserNameField);
+                var vaultPassword = GetKeepassEntryPropertyDereferenced(entry, PwDefs.PasswordField);
+                var vaultUrl = GetKeepassEntryPropertyDereferenced(entry, PwDefs.UrlField);
+                var mountPath = GetKeepassEntryProperty(entry, "MountPath");
                 return !string.IsNullOrEmpty(vaultUrl) &&
                        !string.IsNullOrEmpty(vaultLogin) &&
                        !string.IsNullOrEmpty(vaultPassword) &&
@@ -276,10 +270,10 @@ namespace VaultSyncPlugin
 
         private void SaveAndUpdateUI()
         {
-            this.host.Database.MergeIn(this.host.Database, PwMergeMethod.Synchronize);
-            this.ExecuteInGuiThread(new Action(() =>
+            host.Database.MergeIn(host.Database, PwMergeMethod.Synchronize);
+            ExecuteInGuiThread(new Action(() =>
             {
-                this.host.MainWindow.UpdateUI(false, null, true, this.host.Database.RootGroup, true, null, true);
+                host.MainWindow.UpdateUI(false, null, true, this.host.Database.RootGroup, true, null, true);
             }));
         }
 
@@ -291,8 +285,8 @@ namespace VaultSyncPlugin
         /// <returns>The dereferenced value for this field.</returns>
         private string GetKeepassEntryPropertyDereferenced(PwEntry entry, string field)
         {
-            var value = this.GetKeepassEntryProperty(entry, field);
-            this.ExecuteInGuiThread(new Action(() =>
+            var value = GetKeepassEntryProperty(entry, field);
+            ExecuteInGuiThread(new Action(() =>
             {
                 value = SprEngine.Compile(value, new SprContext(entry, this.host.Database, SprCompileFlags.All));
             }));
@@ -316,21 +310,14 @@ namespace VaultSyncPlugin
         /// <param name="delegate">The delegate to execute</param>
         private void ExecuteInGuiThread(Delegate @delegate)
         {
-            if (this.host.MainWindow.InvokeRequired)
+            if (host.MainWindow.InvokeRequired)
             {
-                this.host.MainWindow.Invoke(@delegate);
+                host.MainWindow.Invoke(@delegate);
             }
             else
             {
                 @delegate.DynamicInvoke();
             }
-        }
-
-        private void OnFileSaved(object sender, FileSavedEventArgs e)
-        {
-            // MessageService.ShowInfo("SamplePlugin has been notified that the user tried to save to the following file:",
-            // 	e.Database.IOConnectionInfo.Path, "Result: " +
-            // 	(e.Success ? "success." : "failed."));
         }
     }
 }
