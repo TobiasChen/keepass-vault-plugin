@@ -210,9 +210,11 @@ namespace VaultSyncPlugin
             var validList = FindEntriesWithVaultConnectionInGroup(vaultGroup);
             if (validList.Count == 0)
             {
-                MessageService.ShowInfo("Please fill in the created Secret with the vault URL, Username and Password");
+                MessageService.ShowInfo("Please fill in the created Secret with the vault URL, Username and Password and the StringField called MountPath. You can additionally set the Field VaultFolder");
                 var vaultEntry = new PwEntry(false, true);
                 vaultEntry.Strings.Set(PwDefs.TitleField, new ProtectedString(false, "First Vault"));
+                vaultEntry.Strings.Set("MountPath", new ProtectedString(false, "kv-v2"));
+                vaultEntry.Strings.Set("VaultFolder",new ProtectedString(false, ""));
                 vaultGroup.Entries.Add(vaultEntry);
                 // SaveAndUpdateUI();
 

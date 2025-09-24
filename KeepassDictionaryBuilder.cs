@@ -24,9 +24,13 @@ namespace VaultSyncPlugin
                 var fields = new Dictionary<String, String>();
                 foreach (var field in e.Strings.GetKeys())
                 {
-                    fields[field] = e.Strings.ReadSafe(field);
+                    var value = e.Strings.Get(field);
+                    if (!value.IsEmpty)
+                    {
+                        fields[field] = value.ReadString();
+                    }
                 }
-                
+
                 dict[path] = new SecretEntry
                 {
                     Fields = fields
