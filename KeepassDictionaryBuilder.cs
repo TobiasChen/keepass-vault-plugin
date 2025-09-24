@@ -24,6 +24,7 @@ namespace VaultSyncPlugin
                 var fields = new Dictionary<String, String>();
                 foreach (var field in e.Strings.GetKeys())
                 {
+                    if (field == PwDefs.TitleField) continue;
                     var value = e.Strings.Get(field);
                     if (!value.IsEmpty)
                     {
